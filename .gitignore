@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables / secrets
+.env
+.env.*
+
+# Caches & tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# Test / coverage artifacts
+coverage.xml
+*.coverage.*
+
+# Build / dist
+build/
+dist/
+
+# Logs
+*.log
+
+# Editor / IDE (Cursor/VSCode/JetBrains)
+.vscode/
+
+# Playwright output (if generated into repo)
+playwright-report/
+
+# App output reports
+main/data/reports/
+
