@@ -164,3 +164,23 @@ def log_workflow_finished(success: bool, failures_count: int, elapsed_seconds: f
 
 def log_user_separator() -> None:
     log_info(".......................")
+
+
+def log_currency_rate(rate: float, source: str) -> None:
+    log_info(f"Currency rate USD->EUR: {rate:.4f} ({source})")
+
+
+def log_report_saved(report_path: str) -> None:
+    log_info(f"Report saved: {report_path}")
+
+
+def log_startup_options(mode: str, settings) -> None:
+    log_info(
+        "Startup options: "
+        f"mode={mode}, "
+        f"kill_on_start={settings.kill_on_start}, "
+        f"browser={settings.browser}, "
+        f"browser_visible={settings.browser_visible}, "
+        f"desktop_report={settings.desktop_report}, "
+        f"report_type={settings.report_type}"
+    )

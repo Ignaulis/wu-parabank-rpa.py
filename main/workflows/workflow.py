@@ -1,57 +1,155 @@
+from datetime import datetime
+
 from common.nav_page import logout, open_loan_page, open_open_account_page
 from core.extract_data import load_users
-from core.logger import log_user_separator
+from core.logger import log_currency_rate, log_report_saved, log_user_separator
+from core.report_writer import write_report
+from data.api.currency_rates import get_usd_to_eur_rate
 from workflows.loan.loan import run_loan_for_user
 from workflows.open_account.open_account import run_open_account_for_user
 from workflows.register.register import run_register_for_user
 
 
-def run_workflow(page, settings) -> tuple[bool, int]:
+def _status_rank(status: str) -> int:
+    if status == "ERROR":
+        return 3
+    if status == "FAIL":
+        return 2
+    return 1
+
+
+def _overall_status(*statuses: str) -> str:
+    worst = "PASS"
+    for status in statuses:
+        if _status_rank(status) > _status_rank(worst):
+            worst = status
+    return worst
+
+
+def run_workflow(page, settings) -> tuple[bool, int, str]:
     users = load_users()
+    usd_to_eur_rate, rate_source = get_usd_to_eur_rate(settings)
+    log_currency_rate(usd_to_eur_rate, rate_source)
     any_failed = False
     failed_users_count = 0
+    report_rows: list[dict] = []
 
     for index, user in enumerate(users):
         is_last = index == len(users) - 1
-        user_failed = False
+        register_status = "PASS"
+        open_account_status = "PASS"
+        loan_status = "PASS"
+        logout_status = "PASS"
+        failed_step = ""
+        error_message = ""
 
-        register_ok = run_register_for_user(page, user, settings)
-        if not register_ok:
-            any_failed = True
-            failed_users_count += 1
-            log_user_separator()
-            continue
+        loan_amount_usd = float(settings.loan_amount)
+        initial_deposit = user.initial_deposit if user.initial_deposit is not None else 0.0
+        down_payment_usd = round(initial_deposit * settings.down_payment_pct, 2)
+        loan_amount_eur = round(loan_amount_usd * usd_to_eur_rate, 2)
+        down_payment_eur = round(down_payment_usd * usd_to_eur_rate, 2)
 
-        user_ok = True
         try:
-            open_open_account_page(page, settings)
-            if not run_open_account_for_user(page, user, settings):
-                user_ok = False
-            else:
-                open_loan_page(page, settings)
-                if not run_loan_for_user(page, user, settings):
-                    user_ok = False
-        except Exception:
-            user_ok = False
+            register_ok = run_register_for_user(page, user, settings)
+            if not register_ok:
+                register_status = "FAIL"
+                failed_step = "register"
+        except Exception as error:
+            register_status = "ERROR"
+            failed_step = "register"
+            error_message = str(error)
 
-        if not user_ok:
-            any_failed = True
-            user_failed = True
-
-        if page and not page.is_closed():
+        if register_status != "PASS":
+            open_account_status = "FAIL"
+            loan_status = "FAIL"
+            logout_status = "FAIL"
+        else:
+            user_ok = True
             try:
-                logout(page, settings)
-            except Exception:
-                if not is_last:
-                    any_failed = True
-                    user_failed = True
-        elif not is_last:
-            any_failed = True
-            user_failed = True
+                open_open_account_page(page, settings)
+                open_account_ok = run_open_account_for_user(page, user, settings)
+                if not open_account_ok:
+                    open_account_status = "FAIL"
+                    failed_step = "open_account"
+                    user_ok = False
+            except Exception as error:
+                open_account_status = "ERROR"
+                failed_step = "open_account"
+                error_message = str(error)
+                user_ok = False
 
-        if user_failed:
+            if user_ok:
+                try:
+                    open_loan_page(page, settings)
+                    loan_ok = run_loan_for_user(page, user, settings)
+                    if not loan_ok:
+                        loan_status = "FAIL"
+                        failed_step = "loan"
+                        user_ok = False
+                except Exception as error:
+                    loan_status = "ERROR"
+                    failed_step = "loan"
+                    error_message = str(error)
+                    user_ok = False
+
+            if page and not page.is_closed():
+                try:
+                    logout(page, settings)
+                except Exception as error:
+                    logout_status = "ERROR"
+                    if not failed_step:
+                        failed_step = "logout"
+                        error_message = str(error)
+                    user_ok = False
+            elif not is_last:
+                logout_status = "FAIL"
+                if not failed_step:
+                    failed_step = "logout"
+                    error_message = "Page closed before logout"
+                user_ok = False
+
+            if not user_ok and logout_status == "PASS":
+                logout_status = "FAIL"
+
+        if not error_message and failed_step:
+            error_message = f"{failed_step} step failed"
+
+        overall_status = _overall_status(register_status, open_account_status, loan_status, logout_status)
+        if overall_status != "PASS":
+            any_failed = True
             failed_users_count += 1
+
+        report_rows.append(
+            {
+                "run_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "dob": user.dob,
+                "debit_card": user.debit_card,
+                "cvv": user.cvv,
+                "account_type": user.account_type,
+                "initial_deposit": initial_deposit,
+                "loan_amount_usd": loan_amount_usd,
+                "down_payment_usd": down_payment_usd,
+                "loan_amount_eur": loan_amount_eur,
+                "down_payment_eur": down_payment_eur,
+                "usd_to_eur_rate": usd_to_eur_rate,
+                "rate_source": rate_source,
+                "report_currency": "EUR",
+                "register_status": register_status,
+                "open_account_status": open_account_status,
+                "loan_status": loan_status,
+                "logout_status": logout_status,
+                "overall_status": overall_status,
+                "failed_step": failed_step,
+                "error_message": error_message,
+            }
+        )
+
         log_user_separator()
 
+    report_path = write_report(report_rows, settings)
+    log_report_saved(report_path)
     success = not any_failed
-    return success, failed_users_count
+    return success, failed_users_count, report_path
