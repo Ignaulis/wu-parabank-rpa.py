@@ -133,6 +133,10 @@ def log_loan_page_open_failed(error: Exception) -> None:
     log_info(f"Loan page open failed: {error}")
 
 
+def log_loan_page_sidebar_timeout_fallback() -> None:
+    log_info("Loan page open via sidebar timed out; using direct URL fallback")
+
+
 def log_loan_started(username: str) -> None:
     log_info(f"Loan started: {username}")
 
@@ -184,3 +188,11 @@ def log_startup_options(mode: str, settings) -> None:
         f"desktop_report={settings.desktop_report}, "
         f"report_type={settings.report_type}"
     )
+
+
+def log_open_account_awaiting_result() -> None:
+    log_info("Open account awaiting result state")
+
+
+def log_fatal_user_flow_stop(username: str, failed_step: str) -> None:
+    log_info(f"Fatal internal error for user {username} at step {failed_step}. Stopping robot.")

@@ -4,6 +4,7 @@ from urllib.request import urlopen
 API_URL = "https://api.exchangerate.host/latest?base=USD&symbols=EUR"
 
 
+# Paima USD i EUR kursa is API arba naudoja fallback
 def get_usd_to_eur_rate(settings, timeout_seconds: int = 10) -> tuple[float, str]:
     try:
         with urlopen(API_URL, timeout=timeout_seconds) as response:

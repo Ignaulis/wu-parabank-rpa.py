@@ -4,6 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Optional
 
 
+# Paima matoma teksta pagal selektoriu
 def take_visible_text(page, selector: str) -> str:
     loc = page.locator(selector)
     if loc.count() == 0:
@@ -14,6 +15,7 @@ def take_visible_text(page, selector: str) -> str:
     return text.strip()
 
 
+# Surenka matomus klaidu tekstus i viena eilute
 def collect_visible_texts(
     page,
     mapping: Sequence[tuple[str, str]],

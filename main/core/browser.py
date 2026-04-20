@@ -14,17 +14,19 @@ from core.logger import (
 )
 
 
+# Suvienodina narsykles pavadinima i Playwright formata
 def _map_browser(browser_name: str) -> str:
     normalized = browser_name.lower()
     if normalized == "chrome":
         return "chromium"
     if normalized == "edge":
-        return "webkit"
+        return "edge"
     if normalized == "safari":
         return "webkit"
     return normalized
 
 
+# Grazina OS proceso pavadinima pagal narsykle
 def _browser_process_name(browser_name: str) -> Optional[str]:
     normalized = browser_name.lower()
     if normalized in ("chrome", "chromium"):
@@ -38,6 +40,7 @@ def _browser_process_name(browser_name: str) -> Optional[str]:
     return None
 
 
+# Priverstinai uzdaro narsykles procesa (jei reikia)
 def kill_browser_process(browser_name: str) -> None:
     process_name = _browser_process_name(browser_name)
     if not process_name:
@@ -56,10 +59,13 @@ def kill_browser_process(browser_name: str) -> None:
         pass
 
 
+# Paleidzia pasirinkta narsykle su norimu matomumu
 def _launch_browser(playwright: Playwright, mapped_browser: str, browser_visible: bool) -> Browser:
     headless = not browser_visible
     if mapped_browser == "chromium":
         return playwright.chromium.launch(headless=headless)
+    if mapped_browser == "edge":
+        return playwright.chromium.launch(channel="msedge", headless=headless)
     if mapped_browser == "firefox":
         return playwright.firefox.launch(headless=headless)
     if mapped_browser == "webkit":
@@ -67,6 +73,7 @@ def _launch_browser(playwright: Playwright, mapped_browser: str, browser_visible
     raise ValueError(f"Unsupported browser: {mapped_browser}")
 
 
+# Atidaro bazini URL su pakartotiniais bandymais
 def _open_base_url_with_retry(page: Page, settings) -> None:
     for attempt in range(1, settings.max_retries + 1):
         try:
@@ -82,14 +89,16 @@ def _open_base_url_with_retry(page: Page, settings) -> None:
                 raise
 
 
+# Tvarkingai uzdaro narsykle ir Playwright sesija
 def _close_browser_session(browser: Browser, playwright: Playwright) -> None:
     browser.close()
     playwright.stop()
 
 
+# Patikrina ar narsykle gali sekmingai pasileisti
 def validate_browser_preflight(settings) -> None:
     mapped_browser = _map_browser(settings.browser)
-    if mapped_browser not in ("chromium", "firefox", "webkit"):
+    if mapped_browser not in ("chromium", "edge", "firefox", "webkit"):
         raise ValueError(f"Unsupported browser option: {settings.browser}")
 
     playwright = sync_playwright().start()
@@ -104,6 +113,7 @@ def validate_browser_preflight(settings) -> None:
         playwright.stop()
 
 
+# Paleidzia narsykle ir atidaro Parabank puslapi
 def open_parabank(settings) -> Tuple[Playwright, Browser, Page]:
     mapped_browser = _map_browser(settings.browser)
     if settings.kill_on_start:

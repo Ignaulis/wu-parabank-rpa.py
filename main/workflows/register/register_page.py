@@ -39,6 +39,7 @@ from .register_selectors import (
 from core.extract_data import UserProfile
 
 
+# Uzpildo registracijos formos laukus
 def fill_registration_form(page, user: UserProfile, settings) -> None:
     page.locator(FIRST_NAME_INPUT).fill(user.first_name)
     page.locator(LAST_NAME_INPUT).fill(user.last_name)
@@ -53,6 +54,7 @@ def fill_registration_form(page, user: UserProfile, settings) -> None:
     page.locator(REPEATED_PASSWORD_INPUT).fill(user.password)
 
 
+# Surenka matomas registracijos klaidas
 def collect_field_errors(page) -> str:
     mapping = [
         ("First Name", FIRST_NAME_ERROR),
@@ -70,6 +72,7 @@ def collect_field_errors(page) -> str:
     return collect_visible_texts(page, mapping, global_selector_optional=GLOBAL_ERROR_BLOCK)
 
 
+# Pateikia registracijos forma ir patikrina rezultata
 def register_user(page, user: UserProfile, settings) -> bool:
     fill_registration_form(page, user, settings)
 

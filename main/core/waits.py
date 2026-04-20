@@ -4,6 +4,7 @@ from typing import Callable, Optional, TypeVar
 T = TypeVar("T")
 
 
+# Laukia kol salyga taps tenkinama arba baigsis laikas
 def wait_until(
     timeout_ms: int,
     poll_interval_s: float,

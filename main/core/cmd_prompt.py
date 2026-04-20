@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 
+# Parodo pasirinkimus ir grazina vartotojo pasirinkta reiksme
 def _ask_choice(title: str, options: list[str], default: str) -> str:
     default_value = default.strip().lower()
     normalized_options = [option.strip().lower() for option in options]
@@ -22,10 +23,12 @@ def _ask_choice(title: str, options: list[str], default: str) -> str:
         print(f"Invalid choice. Use number or one of: {options_text}")
 
 
+# Uzduoda taip ne klausima ir grazina bool reiksme
 def _ask_bool(title: str, default: bool) -> bool:
     return _ask_choice(title, ["yes", "no"], "yes" if default else "no") == "yes"
 
 
+# Surenka paleidimo nustatymus is vartotojo
 def prompt_runtime_settings(base_settings):
     mode = _ask_choice("Choose mode", ["default", "custom"], "default")
     if mode == "default":

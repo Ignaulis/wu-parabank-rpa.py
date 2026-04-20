@@ -1,4 +1,6 @@
 import csv
+import re
+from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 
@@ -34,6 +36,17 @@ REPORT_COLUMNS = [
 ]
 
 
+_ILLEGAL_XLSX_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
+
+
+# Isvalo neleistinus simbolius is langelio reiksmes
+def _sanitize_cell_value(value):
+    if isinstance(value, str):
+        return _ILLEGAL_XLSX_CHARS.sub("", value)
+    return value
+
+
+# Nustato i kurias vietas bus saugoma ataskaita
 def _resolve_output_dirs(settings) -> list[Path]:
     report_dir = Path(settings.report_output_dir)
     if settings.desktop_report:
@@ -44,6 +57,7 @@ def _resolve_output_dirs(settings) -> list[Path]:
     return [report_dir]
 
 
+# Iraso CSV ataskaita i visus nurodytus kelius
 def _write_csv_report(rows: list[dict], output_paths: list[Path]) -> str:
     for output_path in output_paths:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,6 +69,7 @@ def _write_csv_report(rows: list[dict], output_paths: list[Path]) -> str:
     return output_paths[0].as_posix()
 
 
+# Pritaiko stulpeliu plocius pagal turini
 def _fit_worksheet_columns(worksheet) -> None:
     for column in worksheet.columns:
         max_len = 0
@@ -67,24 +82,30 @@ def _fit_worksheet_columns(worksheet) -> None:
         worksheet.column_dimensions[column_letter].width = width
 
 
+# Sukuria ir iraso suformatuota XLSX ataskaita
 def _write_xlsx_report(rows: list[dict], output_paths: list[Path]) -> str:
+    # Sukuria tuscia workbook ir uzdeda antrastes
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "Report"
     worksheet.append(REPORT_COLUMNS)
 
+    # Uzpildo eilutes ir isvalo neleistinus simbolius
     for row in rows:
-        worksheet.append([row.get(column, "") for column in REPORT_COLUMNS])
+        worksheet.append([_sanitize_cell_value(row.get(column, "")) for column in REPORT_COLUMNS])
 
+    # Paryskina ir centruoja antrastes
     header_font = Font(bold=True)
     for cell in worksheet[1]:
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
+    # Nustato paprasta lygiavima duomenu eilutems
     for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
+    # Skaiciu stulpeliams uzdeda vienoda 2 skaitmenu formata
     currency_fields = {"initial_deposit", "loan_amount_usd", "down_payment_usd", "loan_amount_eur", "down_payment_eur"}
     rate_fields = {"usd_to_eur_rate"}
     for cell in worksheet[1]:
@@ -94,8 +115,8 @@ def _write_xlsx_report(rows: list[dict], output_paths: list[Path]) -> str:
                 for item in data_cell:
                     item.number_format = "0.00"
 
+    # Uzfiksuoja antraste ir prideda lentele su stiliumi
     worksheet.freeze_panes = "A2"
-    worksheet.auto_filter.ref = worksheet.dimensions
     if worksheet.max_row >= 2:
         report_table = Table(displayName="ParabankReport", ref=worksheet.dimensions)
         report_table.tableStyleInfo = TableStyleInfo(
@@ -106,16 +127,26 @@ def _write_xlsx_report(rows: list[dict], output_paths: list[Path]) -> str:
             showColumnStripes=False,
         )
         worksheet.add_table(report_table)
+    else:
+        worksheet.auto_filter.ref = worksheet.dimensions
+
+    # Pritaiko stulpeliu plocius pagal ilgiausias reiksmes
     _fit_worksheet_columns(worksheet)
+
+    # Issaugo viena karta i buferi ir iraso i visus kelius
+    buffer = BytesIO()
+    workbook.save(buffer)
+    payload = buffer.getvalue()
     for output_path in output_paths:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        workbook.save(output_path)
+        output_path.write_bytes(payload)
     return output_paths[0].as_posix()
 
 
+# Parenka ataskaitos formata ir issaugo faila
 def write_report(rows: list[dict], settings) -> str:
     report_type = str(settings.report_type).strip().lower()
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
     output_paths = [
         output_dir / f"parabank_report_{timestamp}.{report_type if report_type == 'xlsx' else 'csv'}"
         for output_dir in _resolve_output_dirs(settings)

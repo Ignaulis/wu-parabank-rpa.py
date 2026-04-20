@@ -8,7 +8,6 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class UserProfile:
-    # Registracijai
     first_name: str = ""
     last_name: str = ""
     address: str = ""
@@ -27,6 +26,7 @@ class UserProfile:
     cvv: str = ""
 
 
+# Isvalo reiksme ir pavercia i tvarkinga teksta
 def _clean(value: object) -> str:
 
     if value is None:
@@ -34,6 +34,7 @@ def _clean(value: object) -> str:
     return str(value).strip()
 
 
+# Bando paversti reiksme i skaiciu arba None
 def _to_optional_float(value: object) -> Optional[float]:
     s = _clean(value)
     if not s:
@@ -44,6 +45,7 @@ def _to_optional_float(value: object) -> Optional[float]:
         return None
 
 
+# Uzkelia vartotoju duomenis is CSV failo
 def load_users(csv_path: str | None = None) -> list[UserProfile]:
 
     if csv_path is None:
